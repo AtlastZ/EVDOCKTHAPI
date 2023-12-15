@@ -22,17 +22,17 @@ func fetchDataFromDB(w http.ResponseWriter, db *sql.DB) {
 
 	// Process the query results
 	var id int
-	var name string
+	var skill string
 
 	for rows.Next() {
-		err := rows.Scan(&id, &name)
+		err := rows.Scan(&id, &skill)
 		if err != nil {
 			log.Println(err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 		// You can process the retrieved data here
-		fmt.Fprintf(w, "ID: %d, Name: %s\n", id, name)
+		fmt.Fprintf(w, "ID: %d, Name: %s\n", id, skill)
 	}
 }
 

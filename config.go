@@ -5,5 +5,5 @@ const (
 	DBDriver   = "mysql"
 	DBUser     = "root"
 	DBPassword = "@Password0"
-	DBName     = "tcp(http://3.25.177.42:3306)/96hp"
+	DBName     = "tcp(localhost:3306)/96hp"
 )
