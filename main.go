@@ -1,129 +1,91 @@
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
+	"context"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
+	"encoding/json"
 	"log"
-	"net/http"
-	"time"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
-func fetchDataFromDBJSON(w http.ResponseWriter, db *sql.DB) {
-	// Execute the SQL query
-	log.Println("Fetching JSON data from database")
-	rows, err := db.Query("SELECT * FROM data1")
+type Person struct {
+    Name string `bson:"name"`
+    Age  int `bson:"age"`
+	Brand string `bson:"brand"`
+}
+
+func insertINFO(client *mongo.Client) *mongo.InsertOneResult {
+	collection := client.Database("EVDOCK").Collection("info")
+	result, err := collection.InsertOne(context.TODO(), bson.D{{Key: "name", Value: "HelloWorld2"}, {Key: "age", Value: 30}})
+	fmt.Println("Insert! ->")
 	if err != nil {
-		log.Println(err)
-		http.Error(w, "Internal Server Error JSON", http.StatusInternalServerError)
-		return
+		fmt.Println(err.Error())
 	}
-	log.Println("Fetch JSON data from database successfully")
-	defer rows.Close()
-
-	// Create a slice to hold the retrieved data
-	var data []map[string]interface{}
-
-	// Process the query results
-	var id int
-	var skill string
-
-	for rows.Next() {
-		err := rows.Scan(&id, &skill)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "Internal Server Error API", http.StatusInternalServerError)
-			return
-		}
-
-		// Create a map for each row
-		rowData := map[string]interface{}{
-			"ID":   id,
-			"skill": skill,
-		}
-
-		// Append the map to the data slice
-		data = append(data, rowData)
-	}
-
-	// Encode the data slice as JSON and write it to the response writer
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	return result
 }
 
-// apiHandlerJSON is an HTTP handler function for the API that returns data as JSON.
-func apiHandlerJSON(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	fetchDataFromDBJSON(w, db)
-}
-
-// fetchDataFromDB retrieves data from the database and writes it to the response writer.
-func fetchDataFromDB(w http.ResponseWriter, db *sql.DB) {
-	// Execute the SQL query
-	rows, err := db.Query("SELECT * FROM data1")
+func deleteINFO(client *mongo.Client) *mongo.DeleteResult {
+	collection := client.Database("EVDOCK").Collection("info")
+	result, err := collection.DeleteOne(context.TODO(), bson.D{{Key: "Brand", Value: "Neta"}})
+	// collection.Find(context.TODO(), bson.D{{Key: "", Value: ""}})
+	fmt.Println("Delete! ->")
 	if err != nil {
-		log.Println(err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
+		fmt.Println(err.Error())
 	}
-	defer rows.Close()
-
-	// Process the query results
-	var id int
-	var skill string
-
-	for rows.Next() {
-		err := rows.Scan(&id, &skill)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		// You can process the retrieved data here
-		fmt.Fprintf(w, "ID: %d, Name: %s\n", id, skill)
-	}
+	return result
 }
 
-// dbConnect connects to the database and returns a *sql.DB instance.
-func dbConnect() (*sql.DB, error) {
-	// Open a database connection
-	log.Println("Connecting to database..")
-	db, err := sql.Open(DBDriver, fmt.Sprintf("%s:%s@%s", DBUser, DBPassword, DBName))
-	if err != nil {
-		return nil, err
-	}
-	log.Println("Connected to database.")
-	return db, nil
-}
+func getINFO(client *mongo.Client) any {
+	collection := client.Database("EVDOCK").Collection("info")
+	// filter := bson.D{{Key: "age", Value: 30}} // Adjust filter as needed
 
-// apiHandler is an HTTP handler function for the API.
-func apiHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	fetchDataFromDB(w, db)
-}
+    cursor , err := collection.Find(context.TODO(),bson.D{})
+    if err != nil {
+        log.Fatal(err)
+    }
+	fmt.Println("got data from database")
+    defer cursor.Close(context.TODO())
 
-func greet(w http.ResponseWriter, r *http.Request) {
-	location, err := time.LoadLocation("Asia/Bangkok")
-	if err != nil {
-		fmt.Println("Error loading location:", err)
-		return
-	}
-	fmt.Fprintf(w, "Hello World! %s", (time.Now().In(location)))
+    var results []Person
+    if err := cursor.All(context.TODO(), &results); err != nil {
+        log.Fatal(err)
+    }
+
+    jsonData, err := json.MarshalIndent(results, "", "  ") // Pretty-print JSON
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println(string(jsonData))
+	return jsonData
+}
+func updateINFO(){
+
 }
 
 func main() {
+	// Use the SetServerAPIOptions() method to set the Stable API version to 1
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+	opts := options.Client().ApplyURI("mongodb+srv://admin:kV4vxejori@atlascluster.hz1anm1.mongodb.net/?retryWrites=true&w=majority").SetServerAPIOptions(serverAPI)
 
-	db, err := dbConnect()
+	// Create a new client and connect to the server
+	client, err := mongo.Connect(context.TODO(), opts)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	defer db.Close()
 
-	// Create a new HTTP handler function for the API
-	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
-		apiHandler(w, r, db)
-	})
-	http.HandleFunc("/json", func(w http.ResponseWriter, r *http.Request) {
-		apiHandlerJSON(w, r, db)
-	})
-	http.HandleFunc("/", greet)
-	http.ListenAndServe(":8080", nil)
+	defer func() {
+		if err = client.Disconnect(context.TODO()); err != nil {
+			panic(err)
+		}
+	}()
+
+	// Send a ping to confirm a successful connection
+	if err := client.Database("admin").RunCommand(context.TODO(), bson.D{{Key: "ping", Value: 1}}).Err(); err != nil {
+		panic(err)
+	}
+	fmt.Println("Pinged your deployment. You successfully connected to MongoDB!")
+	fmt.Println("try to insert a new value in the database")
+	getINFO(client)
 }

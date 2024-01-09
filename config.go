@@ -2,8 +2,8 @@
 package main
 
 const (
-	DBDriver   = "mysql"
-	DBUser     = "api"
-	DBPassword = "@PAssword0"
-	DBName     = "tcp(3.25.177.42:3306)/96hp"
+	MongoDBusername = "analyzya"
+	MongoDBpassword = "2Avid0dmMmho95YS"
+	ClusterAddress = ""
+	DatabaseName = ""
 )
